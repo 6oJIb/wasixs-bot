@@ -4,17 +4,33 @@ import disnake
 from disnake.ext import commands
 import json
 
-
-
-
-
 bot = commands.Bot(command_prefix="/", intents=disnake.Intents.all(), test_guilds=[1534901683690274916, 1385567845089542204])
 activeVoices = []
 voiceStatuses = {
-    1534927334371754116: ["default", "<:default1:1535021935430209536>" + "<:default2:1535021950181707866>" + "<:default3:1535021962970136768>" + "<:default4:1535021971115475014>"],
-    1535025690704089161: ["vip", "<:vip1:1535024198278447206>" + "<:vip2:1535024308106166332>"],
-    1535025706277273702: ["admin", "<:admin1:1535024872512688288>" + "<:admin2:1535024888975327322>" + "<:admin3:1535024899184267394>" + "<:admin4:1535024909326221724>"]
+    1534927334371754116: ["default", "<:default1:1535021935430209536><:default2:1535021950181707866><:default3:1535021962970136768><:default4:1535021971115475014>"],
+    1535025690704089161: ["vip", "<:vip1:1535024198278447206><:vip2:1535024308106166332>"],
+    1535025706277273702: ["admin", "<:admin1:1535024872512688288><:admin2:1535024888975327322><:admin3:1535024899184267394><:admin4:1535024909326221724>"]
 }
+
+def channel_id_in_db(channel_id: int):
+    with open("data/VC.json", "r", encoding="utf-8") as f:
+        data = json.load(f)
+    return str(channel_id) in data
+
+def get_status_in_db(channel_id: int):
+    with open("data/VC.json", "r", encoding="utf-8") as f:
+        data = json.load(f)
+    mode: str = data[str(channel_id)]
+    with open("data/VCModes.json", "r", encoding="utf-8") as f:
+        data = json.load(f)
+    return data[mode]
+
+def set_id_in_db(channel_id: int, mode: str):
+    with open("data/VC.json", "r", encoding="utf-8") as f:
+        data = json.load(f)
+    data[str(channel_id)] = mode
+    with open("data/VC.json", "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
 
 # class VoiceControlPanel(disnake.ui.View):
 #     def __init__(self):
@@ -48,18 +64,47 @@ async def on_ready():
 
 
 @bot.slash_command()
-async def setvoicecreator(inter, channel: disnake.VoiceChannel, mode: str):
-    for key, value in voiceStatuses.items():
-        mode_name, emoji_string = value
-        if mode_name == mode:
-            voiceStatuses[channel.id] = voiceStatuses.pop(key)
+async def addvoicecreator(inter, channel: disnake.VoiceChannel, mode: str):
+    if mode not in ["default", "vip", "admin"]:
+        await inter.response.send_message(f"Invalid mode. Please choose from 'default', 'vip', or 'admin'.", ephemeral=True)
+        return
 
-            await inter.response.send_message(
-                f"[{mode}] Voice creator set in [{channel.mention}]!", ephemeral=True)
-            return
+    set_id_in_db(channel.id, mode)
 
-    await inter.response.send_message(f"Mode [{mode}] not found!", ephemeral=True)
+    await inter.response.send_message(f"Voice creator set in [{channel.mention}] for mode [{mode}]!", ephemeral=True)
 
+@bot.slash_command()
+async def deletevoicecreator(inter, channel: disnake.VoiceChannel):
+    if not channel_id_in_db(channel.id):
+        await inter.response.send_message(f"No voice creator found in [{channel.mention}].", ephemeral=True)
+        return
+
+    with open("data/VC.json", "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    del data[str(channel.id)]
+
+    with open("data/VC.json", "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
+
+    await inter.response.send_message(f"Voice creator deleted in [{channel.mention}]!", ephemeral=True)
+
+@bot.slash_command()
+async def listvoicecreators(inter):
+    with open("data/VC.json", "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    if not data:
+        await inter.response.send_message("No voice creators found.", ephemeral=True)
+        return
+
+    embed = disnake.Embed(title="Voice Creators", color=disnake.Color.blue())
+    for channel_id, mode in data.items():
+        channel = bot.get_channel(int(channel_id))
+        if channel:
+            embed.add_field(name=f"{channel.name} [{channel.id}]", value=f"Mode: {mode}", inline=False)
+
+    await inter.response.send_message(embed=embed, ephemeral=True)
 
 @bot.slash_command()
 async def sendembed(inter, channel: disnake.TextChannel, name: str):
@@ -102,7 +147,8 @@ async def on_voice_state_update(member: disnake.Member, before, after: disnake.V
 
     if after.channel is not None:
         id: int = after.channel.id
-        if id in voiceStatuses.keys():
+        
+        if channel_id_in_db(id):
             category = after.channel.category
             numbers = []
             for ch in category.channels:
@@ -117,6 +163,8 @@ async def on_voice_state_update(member: disnake.Member, before, after: disnake.V
 
             new_channel = await after.channel.clone(name=f"voice {next_number}", user_limit=99, position=len(category.channels))
             activeVoices.append(new_channel.id)
+            route = disnake.http.Route("PUT", "/channels/{channel_id}/voice-status", channel_id=new_channel.id)
+            await bot.http.request(route, json={"status": get_status_in_db(id)})
 
             await asyncio.sleep(0.1)
             try:
@@ -125,8 +173,7 @@ async def on_voice_state_update(member: disnake.Member, before, after: disnake.V
                 await asyncio.sleep(0.1)
                 await member.move_to(new_channel)
 
-            route = disnake.http.Route("PUT", "/channels/{channel_id}/voice-status", channel_id=new_channel.id)
-            await bot.http.request(route, json={"status": voiceStatuses[id][1]})
+            
 
 
 @bot.event
