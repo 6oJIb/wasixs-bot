@@ -2,6 +2,11 @@ import asyncio
 import os
 import disnake
 from disnake.ext import commands
+import json
+
+
+
+
 
 bot = commands.Bot(command_prefix="/", intents=disnake.Intents.all(), test_guilds=[1534901683690274916, 1385567845089542204])
 activeVoices = []
@@ -41,8 +46,9 @@ async def on_ready():
     print(f"Logged in as {bot.user.name} ({bot.user.id})")
     print("--------------------------------------------------")
 
+
 @bot.slash_command()
-async def set_voice_creator(inter, channel: disnake.VoiceChannel, mode: str):
+async def setvoicecreator(inter, channel: disnake.VoiceChannel, mode: str):
     for key, value in voiceStatuses.items():
         mode_name, emoji_string = value
         if mode_name == mode:
@@ -53,6 +59,26 @@ async def set_voice_creator(inter, channel: disnake.VoiceChannel, mode: str):
             return
 
     await inter.response.send_message(f"Mode [{mode}] not found!", ephemeral=True)
+
+
+@bot.slash_command()
+async def sendembed(inter, channel: disnake.VoiceChannel, name: str):
+    try:
+        with open(f"data/{name}.json", "r", encoding="utf-8") as f:
+            message_data = json.load(f)
+        embed = disnake.Embed.from_dict(message_data)
+        await channel.send(embed=embed)
+        await inter.response.send_message(f"Embed [{name}] sent to [{channel.mention}]!", ephemeral=True)
+
+    except FileNotFoundError:
+        await inter.response.send_message(f"File [data/{name}.json] not found.", ephemeral=True)
+
+    except json.JSONDecodeError:
+        await inter.response.send_message(f"File [data/{name}.json] contains invalid JSON.", ephemeral=True)
+
+    except Exception as e:
+        await inter.response.send_message(f"Unknown error occurred: {e}", ephemeral=True)
+
 
 @bot.event
 async def on_voice_state_update(member: disnake.Member, before, after: disnake.VoiceState):
@@ -92,6 +118,7 @@ async def on_voice_state_update(member: disnake.Member, before, after: disnake.V
 
             route = disnake.http.Route("PUT", "/channels/{channel_id}/voice-status", channel_id=new_channel.id)
             await bot.http.request(route, json={"status": voiceStatuses[id][1]})
+
 
 @bot.event
 async def on_guild_channel_delete(channel):
