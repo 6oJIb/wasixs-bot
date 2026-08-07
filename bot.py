@@ -62,12 +62,21 @@ async def setvoicecreator(inter, channel: disnake.VoiceChannel, mode: str):
 
 
 @bot.slash_command()
-async def sendembed(inter, channel: disnake.VoiceChannel, name: str):
+async def sendembed(inter, channel: disnake.TextChannel, name: str):
     try:
         with open(f"data/{name}.json", "r", encoding="utf-8") as f:
             message_data = json.load(f)
-        embed = disnake.Embed.from_dict(message_data)
-        await channel.send(embed=embed)
+
+        if "content" in message_data:
+            if message_data["content"] != "" or message_data["content"] is not None:
+                await channel.send(message_data["content"])
+        
+        if "embeds" in message_data:
+            for embed in message_data["embeds"]:
+                await channel.send(embed=disnake.Embed.from_dict(embed))
+        else:
+            await channel.send(embed=disnake.Embed.from_dict(message_data))
+            
         await inter.response.send_message(f"Embed [{name}] sent to [{channel.mention}]!", ephemeral=True)
 
     except FileNotFoundError:
@@ -77,7 +86,7 @@ async def sendembed(inter, channel: disnake.VoiceChannel, name: str):
         await inter.response.send_message(f"File [data/{name}.json] contains invalid JSON.", ephemeral=True)
 
     except Exception as e:
-        await inter.response.send_message(f"Unknown error occurred: {e}", ephemeral=True)
+        await inter.response.send_message(f"An error occurred: {e}", ephemeral=True)
 
 
 @bot.event

@@ -1,0 +1,46 @@
+{
+ "content": null,
+ "embeds": [
+  {
+   "title": "Ссылки на соц. сети wasixs",
+   "fields": [
+    {
+     "name": " ",
+     "value": "[:purple_square:  Twitch - мейн](https://www.twitch.tv/sadwasixs)",
+     "inline": false
+    },
+    {
+     "name": " ",
+     "value": "[:purple_square:  Twitch - доп](https://www.twitch.tv/qwasixs)",
+     "inline": false
+    },
+    {
+     "name": "  ",
+     "value": "[:red_square:  YouTube](https://www.youtube.com/@wasixs)",
+     "inline": false
+    },
+    {
+     "name": " ",
+     "value": "[:green_square:  KICK](https://kick.com/wasixs)",
+     "inline": false
+    },
+    {
+     "name": " ",
+     "value": "[:blue_square:  Telegram](https://t.me/wasixs)",
+     "inline": false
+    },
+    {
+     "name": " ",
+     "value": "[:black_large_square:  Discord](https://discord.com/invite/ZSC4nZqMcP)",
+     "inline": false
+    },
+    {
+     "name": " ",
+     "value": "[:white_large_square:  TapLink](https://taplink.cc/sad_wasixs)",
+     "inline": false
+    }
+   ]
+  }
+ ],
+ "components": null
+}
