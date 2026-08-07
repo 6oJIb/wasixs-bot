@@ -117,7 +117,7 @@ async def sendembed(inter, channel: disnake.TextChannel, name: str):
             message_data = json.load(f)
 
         if "content" in message_data:
-            if message_data["content"] != "" or message_data["content"] is not None:
+            if message_data["content"] != "" and message_data["content"] is not None:
                 await channel.send(message_data["content"])
         
         if "embeds" in message_data:
