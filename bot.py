@@ -1,43 +1,14 @@
-import asyncio
 import os
+import asyncio
+from VoiceSystem import VCSystem
+
 import disnake
 from disnake.ext import commands
+
 import json
 
 bot = commands.Bot(command_prefix="/", intents=disnake.Intents.all(), test_guilds=[1534901683690274916, 1385567845089542204])
 active_voices = []
-
-def channel_id_in_db(channel_id: int):
-    with open("data/VC.json", "r", encoding="utf-8") as f:
-        data = json.load(f)
-    return str(channel_id) in data
-
-def get_status_in_db(channel_id: int):
-    with open("data/VC.json", "r", encoding="utf-8") as f:
-        data = json.load(f)
-    mode: str = data[str(channel_id)]
-    with open("data/VCModes.json", "r", encoding="utf-8") as f:
-        data = json.load(f)
-    return data[mode]
-
-def set_id_in_db(channel_id: int, mode: str):
-    with open("data/VC.json", "r", encoding="utf-8") as f:
-        data = json.load(f)
-    data[str(channel_id)] = mode
-    with open("data/VC.json", "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
-
-def get_voice_number(channel: disnake.VoiceChannel):
-    numbers = []
-    for ch in channel.category.channels:
-        if ch.name.startswith(channel.name.split(" - ")[0]):
-            try:
-                num = int(ch.name.split(" - ")[1])
-                numbers.append(num)
-            except:
-                pass
-    return max(numbers) + 1 if len(numbers) > 0 else 1
-
 
 @bot.event
 async def on_ready():
@@ -60,11 +31,14 @@ async def setvoicecategory(inter, channel: disnake.CategoryChannel):
 
 @bot.slash_command()
 async def addvoicecreator(inter, channel: disnake.VoiceChannel, mode: str):
-    if mode not in ["default", "vip", "admin"]:
-        await inter.response.send_message(f"Invalid mode. Please choose from 'default', 'vip', or 'admin'.", ephemeral=True)
+    if mode not in VCSystem.GetVCREmojis():
+        await inter.response.send_message(
+            f"Invalid mode. Please choose from {", ".join(VCSystem.GetVCREmojis().keys())}",
+            ephemeral=True
+        )
         return
 
-    set_id_in_db(channel.id, mode)
+    VCSystem.SetVCRMode(channel.id, mode)
 
     await inter.response.send_message(f"Voice creator set in [{channel.mention}] for mode [{mode}]!", ephemeral=True)
 
@@ -76,16 +50,17 @@ async def deletevoicecreator(inter, channel_id: str):
     except ValueError:
         await inter.response.send_message(f"Invalid channel ID: {channel_id}. Please provide a valid integer.", ephemeral=True)
         return
-    if not channel_id_in_db(channel_id):
+
+    if not VCSystem.IsVCRExists(channel_id):
         await inter.response.send_message(f"No voice creator found in [{channel_id}].", ephemeral=True)
         return
 
-    with open("data/VC.json", "r", encoding="utf-8") as f:
+    with open("data/VCModes.json", "r", encoding="utf-8") as f:
         data = json.load(f)
 
     del data[str(channel_id)]
 
-    with open("data/VC.json", "w", encoding="utf-8") as f:
+    with open("data/VCModes.json", "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
     await inter.response.send_message(f"Voice creator deleted in [{channel_id}]!", ephemeral=True)
@@ -93,7 +68,7 @@ async def deletevoicecreator(inter, channel_id: str):
 
 @bot.slash_command()
 async def listvoicecreators(inter):
-    with open("data/VC.json", "r", encoding="utf-8") as f:
+    with open("data/VCModes.json", "r", encoding="utf-8") as f:
         data = json.load(f)
 
     if not data:
@@ -112,7 +87,7 @@ async def listvoicecreators(inter):
 @bot.slash_command()
 async def sendembed(inter, channel: disnake.TextChannel, name: str):
     try:
-        with open(f"data/{name}.json", "r", encoding="utf-8") as f:
+        with open(f"data/embeds/{name}.json", "r", encoding="utf-8") as f:
             message_data = json.load(f)
 
         if "content" in message_data:
@@ -128,10 +103,10 @@ async def sendembed(inter, channel: disnake.TextChannel, name: str):
         await inter.response.send_message(f"Embed [{name}] sent to [{channel.mention}]!", ephemeral=True)
 
     except FileNotFoundError:
-        await inter.response.send_message(f"File [data/{name}.json] not found.", ephemeral=True)
+        await inter.response.send_message(f"File [data/embeds/{name}.json] not found.", ephemeral=True)
 
     except json.JSONDecodeError:
-        await inter.response.send_message(f"File [data/{name}.json] contains invalid JSON.", ephemeral=True)
+        await inter.response.send_message(f"File [data/embeds/{name}.json] contains invalid JSON.", ephemeral=True)
 
     except Exception as e:
         await inter.response.send_message(f"An error occurred: {e}", ephemeral=True)
@@ -152,24 +127,27 @@ async def on_voice_state_update(member: disnake.Member, before, after: disnake.V
         ch: disnake.VoiceChannel = after.channel
         id: int = ch.id
         
-        if channel_id_in_db(id):
+        if VCSystem.IsVCRExists(id):
             with open("data/config.json", "r", encoding="utf-8") as f:
                 config = json.load(f)
+
             category: disnake.CategoryChannel = bot.get_channel(config["category_id"])
             if category is None:
                 await member.send("The voice category is not found!")
                 return
+
             new_channel = await after.channel.clone(
                 category=category,
-                name=f"{ch.name} - {get_voice_number(ch)}",
+                name=f"{ch.name} - {VCSystem.GetVoiceNumber(ch.name, category)}",
                 user_limit=99,
                 position=len(category.channels)
             )
+
             active_voices.append(new_channel.id)
             route = disnake.http.Route("PUT", "/channels/{channel_id}/voice-status", channel_id=new_channel.id)
-            await bot.http.request(route, json={"status": get_status_in_db(id)})
-
+            await bot.http.request(route, json={"status": VCSystem.GetVCREmoji(id)})
             await asyncio.sleep(0.1)
+
             try:
                 await member.move_to(new_channel)
             except:
