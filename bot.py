@@ -36,8 +36,7 @@ def get_voice_number(channel: disnake.VoiceChannel):
                 numbers.append(num)
             except:
                 pass
-    return max(numbers) + 1 if numbers else 1
-
+    return max(numbers) + 1 if len(numbers) > 0 else 1
 
 
 @bot.event
@@ -157,6 +156,9 @@ async def on_voice_state_update(member: disnake.Member, before, after: disnake.V
             with open("data/config.json", "r", encoding="utf-8") as f:
                 config = json.load(f)
             category: disnake.CategoryChannel = bot.get_channel(config["category_id"])
+            if category is None:
+                await member.send("The voice category is not found!")
+                return
             new_channel = await after.channel.clone(
                 category=category,
                 name=f"{ch.name} - {get_voice_number(ch)}",
