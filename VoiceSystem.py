@@ -1,4 +1,5 @@
 # VoiceCreator - VCR
+from sys import prefix
 
 from disnake import CategoryChannel
 from typing import Dict
@@ -27,13 +28,25 @@ class VCSystem:
 
     @staticmethod
     def GetVoiceNumber(name: str, category: CategoryChannel):
-        num = 1
-        for ch in category.channels:
-            try: chNum = int(ch.name.split(" - ")[1])
-            except ValueError: continue
+        used = set()
+        channelPrefix = f"{name} - "
 
-            if ch.name.startswith(name) and num <= chNum:
-                num += 1
+        for channel in category.channels:
+            if not channel.name.startswith(channelPrefix):
+                continue
+
+            try:
+                numPart = int(channel.name[len(channelPrefix)])
+                used.add(numPart)
+            except (ValueError, TypeError):
+                continue
+
+        if len(used) == 0 or 1 not in used:
+            return 1
+
+        num = 1
+        while num in used:
+            num += 1
 
         return num
 
