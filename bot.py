@@ -33,7 +33,7 @@ async def setvoicecategory(inter, channel: disnake.CategoryChannel):
 async def addvoicecreator(inter, channel: disnake.VoiceChannel, mode: str):
     if mode not in VCSystem.GetVCREmojis():
         await inter.response.send_message(
-            f"Invalid mode. Please choose from {", ".join(VCSystem.GetVCREmojis().keys())}",
+            f"Invalid mode. Please choose from {', '.join(VCSystem.GetVCREmojis().keys())}",
             ephemeral=True
         )
         return
