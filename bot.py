@@ -1,14 +1,16 @@
-import os
-import asyncio
 from VoiceSystem import VCSystem
+from TrashListSystem import TLSystem
 
 import disnake
 from disnake.ext import commands
 
+import asyncio
 import json
+import os
 
 bot = commands.Bot(command_prefix="/", intents=disnake.Intents.all(), test_guilds=[1534901683690274916, 1385567845089542204])
-active_voices = []
+rolesAccess = ("Людишки с Властью", "адм")
+activeVoices = []
 
 @bot.event
 async def on_ready():
@@ -16,8 +18,19 @@ async def on_ready():
     print("--------------------------------------------------")
 
 
-@bot.slash_command()
-async def setvoicecategory(inter, channel: disnake.CategoryChannel):
+@bot.event
+async def on_slash_command_error(inter: disnake.AppCmdInter, error: Exception):
+    if isinstance(error, (commands.MissingRole, commands.MissingAnyRole, commands.MissingPermissions)):
+        await inter.response.send_message("You don't have permission to do that", ephemeral=True)
+    else:
+        print(f"Unhandled error: {error}")
+        await inter.send("An unexpected error occurred.", ephemeral=True)
+
+
+# region VoiceCreator Logic
+@bot.slash_command(name="set-voice-category", description="Set category for created voices")
+@commands.has_any_role(*rolesAccess)
+async def SetVoiceCategory(inter, channel: disnake.CategoryChannel):
     with open("data/config.json", "r", encoding="utf-8") as f:
         data = json.load(f)
 
@@ -29,8 +42,9 @@ async def setvoicecategory(inter, channel: disnake.CategoryChannel):
     await inter.response.send_message(f"Voice category set to [{channel.mention}]!", ephemeral=True)
 
 
-@bot.slash_command()
-async def addvoicecreator(inter, channel: disnake.VoiceChannel, mode: str):
+@bot.slash_command(name="add-voicecreator", description="-")
+@commands.has_any_role(*rolesAccess)
+async def AddVoiceCreator(inter, channel: disnake.VoiceChannel, mode: str):
     if mode not in VCSystem.GetVCREmojis():
         await inter.response.send_message(
             f"Invalid mode. Please choose from {', '.join(VCSystem.GetVCREmojis().keys())}",
@@ -43,8 +57,9 @@ async def addvoicecreator(inter, channel: disnake.VoiceChannel, mode: str):
     await inter.response.send_message(f"Voice creator set in [{channel.mention}] for mode [{mode}]!", ephemeral=True)
 
 
-@bot.slash_command()
-async def deletevoicecreator(inter, channel_id: str):
+@bot.slash_command(name="delete-voicecreator", description="-")
+@commands.has_any_role(*rolesAccess)
+async def DeleteVoiceCreator(inter, channel_id: str):
     try:
         channel_id = int(channel_id)
     except ValueError:
@@ -66,8 +81,9 @@ async def deletevoicecreator(inter, channel_id: str):
     await inter.response.send_message(f"Voice creator deleted in [{channel_id}]!", ephemeral=True)
 
 
-@bot.slash_command()
-async def listvoicecreators(inter):
+@bot.slash_command(name="voicecreators", description="-")
+@commands.has_any_role(*rolesAccess)
+async def SendVoiceCreatorsList(inter):
     with open("data/VCModes.json", "r", encoding="utf-8") as f:
         data = json.load(f)
 
@@ -84,40 +100,12 @@ async def listvoicecreators(inter):
     await inter.response.send_message(embed=embed, ephemeral=True)
 
 
-@bot.slash_command()
-async def sendembed(inter, channel: disnake.TextChannel, name: str):
-    try:
-        with open(f"data/embeds/{name}.json", "r", encoding="utf-8") as f:
-            message_data = json.load(f)
-
-        if "content" in message_data:
-            if message_data["content"] != "" and message_data["content"] is not None:
-                await channel.send(message_data["content"])
-        
-        if "embeds" in message_data:
-            for embed in message_data["embeds"]:
-                await channel.send(embed=disnake.Embed.from_dict(embed))
-        else:
-            await channel.send(embed=disnake.Embed.from_dict(message_data))
-            
-        await inter.response.send_message(f"Embed [{name}] sent to [{channel.mention}]!", ephemeral=True)
-
-    except FileNotFoundError:
-        await inter.response.send_message(f"File [data/embeds/{name}.json] not found.", ephemeral=True)
-
-    except json.JSONDecodeError:
-        await inter.response.send_message(f"File [data/embeds/{name}.json] contains invalid JSON.", ephemeral=True)
-
-    except Exception as e:
-        await inter.response.send_message(f"An error occurred: {e}", ephemeral=True)
-
-
 @bot.event
 async def on_voice_state_update(member: disnake.Member, before, after: disnake.VoiceState):
     if before.channel is not None:
-        if before.channel.id in active_voices:
+        if before.channel.id in activeVoices:
             if len(before.channel.members) == 0:
-                active_voices.remove(before.channel.id)
+                activeVoices.remove(before.channel.id)
                 try:
                     await before.channel.delete()
                 except disnake.NotFound:
@@ -143,7 +131,7 @@ async def on_voice_state_update(member: disnake.Member, before, after: disnake.V
                 position=len(category.channels)
             )
 
-            active_voices.append(new_channel.id)
+            activeVoices.append(new_channel.id)
             route = disnake.http.Route("PUT", "/channels/{channel_id}/voice-status", channel_id=new_channel.id)
             await bot.http.request(route, json={"status": VCSystem.GetVCREmoji(id)})
             await asyncio.sleep(0.1)
@@ -157,9 +145,68 @@ async def on_voice_state_update(member: disnake.Member, before, after: disnake.V
 
 @bot.event
 async def on_guild_channel_delete(channel):
-    if channel.id in active_voices:
-        active_voices.remove(channel.id)         
+    if channel.id in activeVoices:
+        activeVoices.remove(channel.id)
+# endregion
 
+# region TrashList Logic
+@bot.slash_command(name="add-trash", description="Add user to trashlist")
+@commands.has_any_role(*rolesAccess)
+async def AddUserToTrashList(inter, user_id: str, reason: str):
+    if len(reason) <= 0:
+        await inter.response.send_message(
+            f"Please provide a valid reason",
+            ephemeral=True
+        )
+        return
+
+    TLSystem.AddTrash(user_id, reason)
+    await inter.response.send_message("User added to trashlist", ephemeral=True)
+
+
+@bot.slash_command(name="remove-trash", description="Remove user from trashlist")
+@commands.has_any_role(*rolesAccess)
+async def RemoveUserFromTrashList(inter, user_id: str, reason: str):
+    if len(reason) <= 0:
+        await inter.response.send_message(
+            f"Please provide a valid reason",
+            ephemeral=True
+        )
+        return
+
+    TLSystem.RemoveTrash(user_id, reason)
+    await inter.response.send_message("User removed from trashlist", ephemeral=True)
+
+
+@bot.slash_command(name="trashlist", description="Shows people with 'Отброс' role")
+@commands.has_any_role(*rolesAccess)
+async def SendTrashList(inter):
+    trashList = TLSystem.GetTrashes()
+
+    if len(trashList) == 0:
+        await inter.response.send_message(f"List is empty", ephemeral=True)
+        return
+
+    description = ""
+    for i, kv in enumerate(trashList.items()):
+        k, v = kv
+        description += f"**{i + 1}.** **{k}** **-** `{v}`\n"
+
+    embed = disnake.Embed(
+        title="🗑️ Trash List",
+        description=description,
+        color=0x00BFFF
+    )
+
+    await inter.response.send_message(embed=embed, ephemeral=True)
+
+
+@bot.slash_command(name="clear-trashlist", description="Clears trashlist data")
+@commands.has_any_role(*rolesAccess)
+async def ClearTrashList(inter):
+    TLSystem.ClearTrashList()
+    await inter.response.send_message("trashlist cleared", ephemeral=True)
+# endregion
 
 TOKEN = os.getenv("BOT_TOKEN")
 bot.run(TOKEN)

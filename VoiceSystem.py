@@ -1,5 +1,4 @@
 # VoiceCreator - VCR
-from sys import prefix
 
 from disnake import CategoryChannel
 from typing import Dict
@@ -20,14 +19,14 @@ class VCSystem:
 
 
     @staticmethod
-    def GetVCREmoji(channelID: int | str):
+    def GetVCREmoji(channelID: int | str) -> str:
         emojis, vcrs = VCSystem.GetVCREmojis(), VCSystem.GetVCRs()
         vcrMode = vcrs[str(channelID)]
         return emojis[vcrMode]
 
 
     @staticmethod
-    def GetVoiceNumber(name: str, category: CategoryChannel):
+    def GetVoiceNumber(name: str, category: CategoryChannel) -> int:
         used = set()
         channelPrefix = f"{name} - "
 
@@ -62,4 +61,4 @@ class VCSystem:
         vcrs[str(channelID)] = mode
 
         with open("data/VCModes.json", "w", encoding="utf-8") as f:
-            json.dump(vcrs, f, ensure_ascii=False, indent=4)
+            json.dump(vcrs, f, indent=4, ensure_ascii=False)
