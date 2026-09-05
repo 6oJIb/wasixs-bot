@@ -7,7 +7,7 @@ class PunishedSystem:
 
     @staticmethod
     def GetPunishedListPath() -> Path:
-        return Path("data/TrashList.json")
+        return Path("data/PunishedList.json")
 
     @staticmethod
     def GetPunished() -> Dict[str, str]:
@@ -17,56 +17,56 @@ class PunishedSystem:
             tlPath.open(mode="w")
             tlPath.write_text("{}")
 
-        trashList = tlPath.read_text(encoding="utf-8")
-        return dict(json.loads(trashList))
+        punishedList = tlPath.read_text(encoding="utf-8")
+        return dict(json.loads(punishedList))
 
     @staticmethod
     def AddPunished(member: disnake.Member, reason: str) -> None:
-        trashList = PunishedSystem.GetPunished()
+        punishedList = PunishedSystem.GetPunished()
         userID = str(member.id)
 
-        if trashList.get(userID) is not None:
+        if punishedList.get(userID) is not None:
             return
 
-        trashList[userID] = reason
+        punishedList[userID] = reason
         PunishedSystem.PunishedListUpdate(
-            trashList, f"{userID} added to trashlist due to {reason}"
+            punishedList, f"{userID} added to punished list due to {reason}"
         )
 
     @staticmethod
     def RemovePunished(member: disnake.Member, reason: str) -> None:
-        trashList = PunishedSystem.GetPunished()
+        punishedList = PunishedSystem.GetPunished()
         userID = str(member.id)
 
-        if trashList.get(userID) is None:
+        if punishedList.get(userID) is None:
             return
 
-        trashList.pop(userID)
+        punishedList.pop(userID)
         PunishedSystem.PunishedListUpdate(
-            trashList, f"{userID} removed from trashlist due to {reason}"
+            punishedList, f"{userID} removed from punished list due to {reason}"
         )
 
     @staticmethod
     def ClearPunishedList() -> None:
-        trashList = PunishedSystem.GetPunished()
-        trashList.clear()
+        punishedList = PunishedSystem.GetPunished()
+        punishedList.clear()
         PunishedSystem.PunishedListUpdate(
-            trashList, "trashlist cleared"
+            punishedList, "punished list cleared"
         )
 
     @staticmethod
-    def UpdatePunishedList(trashList: Dict[str, str]) -> None:
+    def UpdatePunishedList(punishedList: Dict[str, str]) -> None:
         tlPath = PunishedSystem.GetPunishedListPath()
 
         tlPath.write_text(
-            json.dumps(trashList, indent=4, ensure_ascii=False),
+            json.dumps(punishedList, indent=4, ensure_ascii=False),
             encoding="utf-8"
         )
 
     @staticmethod
-    def PunishedListUpdate(trashList: Dict[str, str], action: str) -> None:
-        PunishedSystem.UpdatePunishedList(trashList)
-        changes = Path("data/TrashListChanges.txt")
+    def PunishedListUpdate(punishedList: Dict[str, str], action: str) -> None:
+        PunishedSystem.UpdatePunishedList(punishedList)
+        changes = Path("data/PunishedListChanges.txt")
 
         if not changes.exists():
             changes.open(mode="w").seek(0)
